@@ -20,7 +20,7 @@ def cnn_model_fn(features, labels, mode):
     # Input Layer
     input_layer = tf.reshape(features["x"], [-1, 28, 28, 1])
 
-  # Convolutional Layer #1
+    # Convolutional Layer #1
     conv1 = tf.layers.conv2d(
       inputs=input_layer,
       filters=32,
@@ -28,10 +28,10 @@ def cnn_model_fn(features, labels, mode):
       padding="same",
       activation=tf.nn.relu)
 
-  # Pooling Layer #1
+    # Pooling Layer #1
     pool1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=[2, 2], strides=2)
 
-  # Convolutional Layer #2 and Pooling Layer #2
+    # Convolutional Layer #2 and Pooling Layer #2
     conv2 = tf.layers.conv2d(
       inputs=pool1,
       filters=64,
@@ -40,7 +40,7 @@ def cnn_model_fn(features, labels, mode):
       activation=tf.nn.relu)
     pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2, 2], strides=2)
 
-  # Dense Layer
+     # Dense Layer
     pool2_flat = tf.reshape(pool2, [-1, 7 * 7 * 64])
     dense = tf.layers.dense(inputs=pool2_flat, units=100, activation=tf.nn.relu)
     dropout = tf.layers.dropout(
@@ -48,7 +48,7 @@ def cnn_model_fn(features, labels, mode):
     print(np.core.fromnumeric.shape(conv2))
     print(np.core.fromnumeric.shape(pool2))
   
-  # Logits Layer
+    # Logits Layer
     logits = tf.layers.dense(inputs=dropout, units=10)
 
     predictions = {
@@ -62,12 +62,12 @@ def cnn_model_fn(features, labels, mode):
     if mode == tf.estimator.ModeKeys.PREDICT:
         return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
 
-  # Calculate Loss (for both TRAIN and EVAL modes)
+    # Calculate Loss (for both TRAIN and EVAL modes)
     onehot_labels = tf.one_hot(indices=tf.cast(labels, tf.int32), depth=10)
     loss = tf.losses.softmax_cross_entropy(
       onehot_labels=onehot_labels, logits=logits)
 
-  # Configure the Training Op (for TRAIN mode)
+    # Configure the Training Op (for TRAIN mode)
     if mode == tf.estimator.ModeKeys.TRAIN:
         optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.001)
         train_op = optimizer.minimize(
@@ -75,7 +75,7 @@ def cnn_model_fn(features, labels, mode):
         global_step=tf.train.get_global_step())
         return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
 
-  # Add evaluation metrics (for EVAL mode)
+    # Add evaluation metrics (for EVAL mode)
     eval_metric_ops = {
       "accuracy": tf.metrics.accuracy(
           labels=labels, predictions=predictions["classes"])}
