@@ -142,6 +142,7 @@ def train_and_save(expertfile, actionfile='action.pkl',iterations=10000):
     
     estimator.train(input_fn=train_input_fn, steps=iterations)
     print('---------------------Model is trained')
+    estimator.export_savedmodel('./trained_model', train_input_fn)
     #saver = tf.train.Saver(max_to_keep=1)
     
     #with open('model.pl;', 'wb') as output:
@@ -227,30 +228,21 @@ def play_actions(action_file):
     print('reward:', totalr)  
     return
 
-def norm(tensor):
-    
-    return tf.div(
-   tf.subtract(
-      tensor, 
-      tf.reduce_min(tensor)
-   ), 
-   tf.subtract(
-      tf.reduce_max(tensor), 
-      tf.reduce_min(tensor)
-   )
-)
 
-def generate_expert_file(expertfile, num_rollouts=20):
+
+
+
+def generate_expert_file(filetogenerate,policyfile='./experts/Humanoid-v1.pkl', envname='Humanoid-v1', max_steps=1000, num_rollouts=20):
+    #generates expert_file(provided by berkley DRL class) with policy for environments
     print('loading and building expert policy')
-    policy_fn = load_policy.load_policy('./experts/Humanoid-v1.pkl')
+    policy_fn = load_policy.load_policy(policyfile)
     print('loaded and built')
 
     with tf.Session():
         tf_util.initialize()
 
         import gym
-        env = gym.make('Humanoid-v1')
-        max_steps = 1000
+        env = gym.make(envname)
 
         returns = []
         observations = []
@@ -268,6 +260,7 @@ def generate_expert_file(expertfile, num_rollouts=20):
                 obs, r, done, _ = env.step(action)
                 totalr += r
                 steps += 1
+                #env.render()
                 if steps % 100 == 0: print("%i/%i"%(steps, max_steps))
                 if steps >= max_steps:
                     break
@@ -279,16 +272,16 @@ def generate_expert_file(expertfile, num_rollouts=20):
 
         expert_data = {'observations': np.array(observations),
                        'actions': np.array(actions)}
-        with open(expertfile, 'wb') as output:
+        with open(filetogenerate, 'wb') as output:
             pickle.dump(expert_data,output, pickle.HIGHEST_PROTOCOL)
     return
 
 
 if __name__ == '__main__':
     #generate rollouts
-    #generate_expert_file('expert150.pkl', 150)
+    generate_expert_file(filetogenerate='Walkerxpert100.pkl',policyfile='./experts/Walker2d-v1.pkl',envname='Walker2d-v1', num_rollouts=150)
     #train_and_save('expert150.pkl', 'action150.pkl',1000000)
-    play_actions('actions_clone.pkl')
+    #play_actions('actions_clone.pkl')
    
     
 

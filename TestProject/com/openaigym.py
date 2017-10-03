@@ -4,6 +4,8 @@ Created on Sep 19, 2017
 @author: ubuntu
 '''
 import gym
+
+
 env = gym.make('CartPole-v0')
 env.reset()
 for _ in range(1000):

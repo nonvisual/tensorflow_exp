@@ -22,7 +22,7 @@ from tensorflow.python.ops import init_ops
 from tensorflow.python.training.session_run_hook import SessionRunHook
 from tensorflow.python.training.basic_session_run_hooks import SummarySaverHook
 from behavior_cloning import utils
-from behavior_cloning.utils import ReportLossHook
+from behavior_cloning.utils import normalize
  
 
 def clone_model_fn(features, labels, mode):
@@ -67,14 +67,6 @@ def clone_model_fn(features, labels, mode):
       mode=mode, loss=loss, eval_metric_ops=eval_metric_ops)
     
     
-def normalize (observations):  
-    # normalizes observations data by mean and sd
-    mean = np.mean(observations, axis= 0)
-    sd = np.std(observations, axis=0)
-    sd=sd+0.0001
-    for idx, val in enumerate(observations):
-        observations[idx] = (val-mean)/ (sd)
-    return mean, sd
 
 
 
@@ -116,10 +108,7 @@ if __name__ == '__main__':
         num_epochs=None,
         shuffle=True)
     
-    tensors_to_log = {'loss': 'mserror'}
     tf.logging.set_verbosity(tf.logging.INFO)
-    logging_hook = tf.train.LoggingTensorHook(
-        tensors=tensors_to_log, every_n_iter=10)
     beh_clone.train(
         input_fn=train_input_fn,
         steps=3000,hooks=[])

@@ -3,8 +3,11 @@ Created on Sep 14, 2017
 
 @author: ubuntu
 '''
-import tensorflow as tf;
 from numpy import square
+
+import numpy as np
+import tensorflow as tf;
+
 
 node1 = tf.constant(3.0);
 node2 = tf.constant(5.0);
@@ -56,7 +59,6 @@ print(session.run([W,b]))
 
 
 #===================Using estimator
-import numpy as np
 
 feature_columns = [tf.feature_column.numeric_column("x", shape=[1])]
 

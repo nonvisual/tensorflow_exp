@@ -7,10 +7,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Imports
 import numpy as np
 import tensorflow as tf
 
+
+# Imports
 tf.logging.set_verbosity(tf.logging.INFO)
 
 # Our application logic will be added here
@@ -89,11 +90,11 @@ if __name__ == "__main__":
     tf.reset_default_graph()
     mnist = tf.contrib.learn.datasets.load_dataset("mnist")
     train_data = mnist.train.images # Returns np.array
-    train_labels = np.asarray(mnist.train.labels, dtype=np.int32)
+    train_actions = np.asarray(mnist.train.labels, dtype=np.int32)
     eval_data = mnist.test.images # Returns np.array
-    eval_labels = np.asarray(mnist.test.labels, dtype=np.int32)
+    eval_actions = np.asarray(mnist.test.labels, dtype=np.int32)
     
-    mnist_classifier = tf.estimator.Estimator(
+    beh_clone = tf.estimator.Estimator(
     model_fn=cnn_model_fn, model_dir="/tmp/mnist_convnet_model")
     
     tensors_to_log = {"probabilities": "softmax_tensor"}
@@ -102,22 +103,22 @@ if __name__ == "__main__":
     
     train_input_fn = tf.estimator.inputs.numpy_input_fn(
     x={"x": train_data},
-    y=train_labels,
+    y=train_actions,
     batch_size=100,
     num_epochs=None,
     shuffle=True)
-    mnist_classifier.train(
+    beh_clone.train(
     input_fn=train_input_fn,
     steps=10,
     hooks=[logging_hook])
     
     eval_input_fn = tf.estimator.inputs.numpy_input_fn(
     x={"x": eval_data},
-    y=eval_labels,
+    y=eval_actions,
     num_epochs=1,
     shuffle=False)
-    eval_results = mnist_classifier.evaluate(input_fn=eval_input_fn)
+    eval_results = beh_clone.evaluate(input_fn=eval_input_fn)
     
     print(eval_results)
-    del mnist_classifier
+    del beh_clone
     print("Done")
