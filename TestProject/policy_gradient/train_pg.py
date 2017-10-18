@@ -94,7 +94,9 @@ def train_PG(exp_name='',
              seed=0,
              # network arguments
              n_layers=1,
-             size=32
+             size=32,
+             store_rewards = True
+
              ):
 
     start = time.time()
@@ -194,7 +196,7 @@ def train_PG(exp_name='',
     # Loss Function and Training Operation
     #========================================================================================#
     
-    optimizer = tf.train.RMSPropOptimizer(learning_rate)
+    optimizer = tf.train.AdamOptimizer(learning_rate)
     
     weighted_negative_lkhs = tf.multiply(sy_logprob_n, sy_adv_n)
     loss = tf.reduce_mean(weighted_negative_lkhs)  # Loss function that we'll differentiate to get the policy gradient.
@@ -240,8 +242,7 @@ def train_PG(exp_name='',
     total_timesteps = 0
     prev_loss = 0
     stored_paths = []
-    stored_size = 100
-    store_rewards = True
+    stored_size = 40
     for itr in range(n_iter):
         print("********** Iteration %i ************" % itr)
 
@@ -269,7 +270,7 @@ def train_PG(exp_name='',
             path = {"observation" : np.array(obs),
                     "reward" : np.array(rewards),
                     "action" : np.array(acs),
-                    "final_reward": rewards[-1]}
+                    "final_reward": np.sum(rewards)}
             paths.append(path)
             timesteps_this_batch += pathlength(path)
             if timesteps_this_batch > min_timesteps_per_batch:
@@ -278,14 +279,21 @@ def train_PG(exp_name='',
 
         # Build arrays for observation, action for the policy gradient update by concatenating 
         # across paths
-        ob_no = np.concatenate([path["observation"] for path in paths])
-        ac_na = np.concatenate([path["action"] for path in paths])
-
+       
         # TODO: store more rewarding paths and add them to batches
                           
         q_n = []
+        extended_paths=paths
+        if(store_rewards):
+            stored_paths=np.concatenate([stored_paths,sorted(paths, key=itemgetter('final_reward'))])
+            stored_paths = sorted(stored_paths, key=itemgetter('final_reward'),reverse=True)[0:stored_size]
+            extended_paths=np.concatenate([paths,stored_paths])
+            print("max reward", stored_paths[0]["final_reward"])   
+        ob_no = np.concatenate([path["observation"] for path in extended_paths])
+        ac_na = np.concatenate([path["action"] for path in extended_paths])
+ 
         if reward_to_go == True:
-            for path in paths:
+            for path in extended_paths:
                 r = []  # compute full reward for the trajectory
                 t = 0
                 for i in reversed(path['reward']):
@@ -293,34 +301,15 @@ def train_PG(exp_name='',
                     r.append(t)
                 q_n += r[::-1]
         else:
-            for path in paths:
+            for path in extended_paths:
                 r = 0  # compute full reward for the trajectory
                 for i in reversed(path['reward']):
                     r = gamma * r + i
                 for i in path['reward']:
                     q_n.append(r)
         
-        if(store_rewards):
-            stored_paths.append(sorted(paths, key=itemgetter('final_reward')))
-            stored_paths = sorted(paths, key=itemgetter('final_reward'))[0:stored_size - 1]
-
-            ob_no = np.concatenate([ob_no, np.concatenate([path["observation"] for path in stored_paths]) ])
-            ac_na = np.concatenate([ac_na, np.concatenate([path["action"] for path in stored_paths])  ])
-            if reward_to_go == True:
-                for path in stored_paths:
-                    r = []  # compute full reward for the trajectory
-                    t = 0
-                    for i in reversed(path['reward']):
-                        t = gamma * t + i
-                        r.append(t)
-                    q_n += r[::-1]
-            else:
-                for path in stored_paths:
-                    r = 0  # compute full reward for the trajectory
-                    for i in reversed(path['reward']):
-                        r = gamma * r + i
-                    for i in path['reward']:
-                        q_n.append(r)
+        
+          
                             
         #====================================================================================#
         #                           ----------SECTION 5----------
@@ -366,7 +355,7 @@ def train_PG(exp_name='',
             # Hint #bl2: Instead of trying to target raw Q-values directly, rescale the 
             # targets to have mean zero and std=1. (Goes with Hint #bl1 above.)
             values = []
-            for path in paths:
+            for path in extended_paths:
                 r = 0  # compute full reward for the trajectory
                 for i in reversed(path['reward']):
                     r = gamma * r + i
