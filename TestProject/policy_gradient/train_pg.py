@@ -155,10 +155,10 @@ def train_PG(exp_name='',
     if discrete:
         sy_ac_na = tf.placeholder(shape=[None], name="ac", dtype=tf.int32) 
     else:
-        if ac_dim == 1:  # in case of single action, still shape is None, but type is different
-            sy_ac_na = tf.placeholder(shape=[None], name="ac", dtype=tf.float32) 
-        else:
-            sy_ac_na = tf.placeholder(shape=[None, ac_dim], name="ac", dtype=tf.float32) 
+#         if ac_dim == 1:  # in case of single action, still shape is None, but type is different
+#             sy_ac_na = tf.placeholder(shape=[None], name="ac", dtype=tf.float32) 
+#         else:
+        sy_ac_na = tf.placeholder(shape=[None, ac_dim], name="ac", dtype=tf.float32) 
 
     # Define a placeholder for advantages = how much better our policy is than baseline
     sy_adv_n = tf.placeholder(shape=[None], name="adv", dtype=tf.float32) 
@@ -260,7 +260,7 @@ def train_PG(exp_name='',
                     time.sleep(0.05)
                 obs.append(ob)
                 ac = sess.run(sy_sampled_ac, feed_dict={sy_ob_no : ob[None]})
-                ac = ac[0]
+                #ac = ac[0]
                 acs.append(ac)
                 ob, rew, done, _ = env.step(ac)
                 rewards.append(rew)
