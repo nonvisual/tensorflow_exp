@@ -54,33 +54,23 @@ from sklearn.neural_network import MLPRegressor
 
 
 
-path = '~/Documents/Favorita/'
+path = '~/Documents/tensorflow/Kaggle/Favorita/'
 
+# decode date, add payday field
 def df_transform(df):
 
     df['date'] = pd.to_datetime(df['date'])
-
     df['yea'] = df['date'].dt.year
-
     df['mon'] = df['date'].dt.month
-
     df['day'] = df['date'].dt.day
-
     df['weekday'] = df['date'].dt.dayofweek
 
     df['onpromotion'] = df['onpromotion'].map({'False': 0, 'True': 1})
-
     df['perishable'] = df['perishable'].map({0:1.0, 1:1.25})
     
-
+    # distance to the payday
     df['payday'] = np.minimum(31-df['day'],np.abs(15-df['day']))
     df['payday'] = np.minimum(df['day']-1, df['payday'])
-
-    
-#     ((df['day']==14) |(df['day']==15) |(df['day']==16) | \
-# 
-#                     (df['day']==30) | (df['day']==31) | (df['day']==1))
-
     gc.collect()
     df.fillna(-1,inplace =True)
 
@@ -89,7 +79,6 @@ def df_transform(df):
 
 
 # encode factor as numerical (better use embedding)
-
 def df_lbl_enc(df):
 
     for c in df.columns:
@@ -108,41 +97,30 @@ def df_lbl_enc(df):
 
 
 
-# add pay_dates effect on days of 15, 30 of each month
+# prepare the dataset
 
 def prepare(path, remove_days_after_earthquake=0):
 
     # track time
-
     start_time = time.time()
-
-    tcurrent   = start_time
 
     
 
     # read datasets
-
     print('Read dataset')
 
 
-
     dtypes = {'id':'int64', 'item_nbr':'int32', 'store_nbr':'int8', 'onpromotion':str}
-
     data = {
 
         'tra': pd.read_csv(path+'train.csv', dtype=dtypes, parse_dates=['date']),
-
         'tes': pd.read_csv(path+'test.csv', dtype=dtypes, parse_dates=['date']),
-
         'ite': pd.read_csv(path+'items.csv'),
-
         'sto': pd.read_csv(path+'stores.csv'),
 
 #         'trn': pd.read_csv(path+'transactions.csv', parse_dates=['date']),
 
         'hol': pd.read_csv(path+'holidays_events.csv', dtype={'transferred':str}, parse_dates=['date']),
-
-#         'oil': pd.read_csv(path+'oil.csv', parse_dates=['date']),
 
     }
 
@@ -226,18 +204,7 @@ def prepare(path, remove_days_after_earthquake=0):
 
     del data['hol']; gc.collect();
 
-    
 
- 
-#     print('---Join oil prices')
-# 
-#     train = pd.merge(train, data['oil'], how='left', on=['date'])
-# 
-#     test = pd.merge(test, data['oil'], how='left', on=['date'])
-# 
-#     del data['oil']; gc.collect();
-
-    
     print('transforming dates')
     train = df_transform(train)
     gc.collect();
@@ -250,19 +217,14 @@ def prepare(path, remove_days_after_earthquake=0):
 #     col = [c for c in train if c not in ['id', 'unit_sales','perishable','transactions']]
 
     print('Dataset prepared, elapsed time ',(time.time() - start_time))
-
-    
-
-    
-
-   
+  
 
     return train,test
 
     
 
     
-
+# normalize column with idx indices 
 def normalize(data,idx):
 
     mean = []
@@ -285,6 +247,7 @@ def normalize(data,idx):
 
 
 
+# split in train and test by date using the ratio
 def split_by_date(df, ratio=0.95):
 
     min_date = np.min(df['date'])
@@ -302,10 +265,10 @@ def split_by_date(df, ratio=0.95):
     return train,test
 
 
+# split in test and train by specific month (which is taken for test)
+def split_by_month_in_test(df, year=2016, month = 8):
 
-def split_by_exact_date(df, day=1, month = 8):
-
-    idx= (df['date'].dt.month==month) & (df['date'].dt.year==2016)
+    idx= (df['date'].dt.month==month) & (df['date'].dt.year==year)
 
     train = df[~idx]
 
@@ -334,11 +297,11 @@ def nwrmsle(weights,real,pred):
         sum+=s 
 
         
-
     return sqrt(sum/norm)
 
 
 
+# cluster items with Kmeans in specified number of clusters
 def cluster_items(train,test,clusters=100):
 
     aggr = train.groupby(['item_nbr','weekday'], as_index=False)['unit_sales'].agg({'av_sales':'mean'})
@@ -356,7 +319,7 @@ def cluster_items(train,test,clusters=100):
     return train,test
 
 
-
+# make equal binning of items by sales unit
 def bin_items(train,test,clusters =100):
 
     aggr = train.groupby(['item_nbr'], as_index=False)['unit_sales'].agg({'av_sales':'mean'})
@@ -368,8 +331,7 @@ def bin_items(train,test,clusters =100):
     aggr['bin'] = bins
 
     train = pd.merge(train, aggr, how='left', on=['item_nbr'])
-
-    
+ 
 
     
 
@@ -379,16 +341,13 @@ def bin_items(train,test,clusters =100):
  
     new_items = new_items.merge(test[~test['item_nbr'].duplicated()], how='left', on=['item_nbr',])
  
+    # compute average bin value for the following grouping
     aggr2 = train.groupby(['family', 'class', 'perishable'], as_index=False)['bin'].agg({'av_bin':'mean'})
  
     new_items =  pd.merge(new_items, aggr2, how='left', on=['family', 'class', 'perishable'])
  
     new_items['bin'] = new_items.round({'av_bin':0})['av_bin']
  
-#     
-# 
-#     
-# 
     all_items = aggr[['item_nbr','bin']].append(new_items[['item_nbr','bin']])
 
 #     del aggr,aggr2,new_items,bins; gc.collect();
@@ -406,12 +365,8 @@ def bin_items(train,test,clusters =100):
 
 #     test['bin']
 
-    test['bin'] = test['bin'].fillna(clusters/2)
-
-
-
     
-
+    test['bin'] = test['bin'].fillna(clusters/2)
     
 
 #     aggr = train.groupby(['family', 'class', 'perishable'], as_index=False)['bin'].agg({'av_bin':'mean'})
@@ -421,8 +376,7 @@ def bin_items(train,test,clusters =100):
 
 
     # for unseen items - find the average bin from similar products 
-
-    
+ 
 
     return train,test
 
