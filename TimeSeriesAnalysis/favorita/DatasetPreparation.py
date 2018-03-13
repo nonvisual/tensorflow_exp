@@ -34,7 +34,7 @@ from sklearn.preprocessing import LabelBinarizer
 
 
 
-from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor,GradientBoostingRegressor
+from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor, GradientBoostingRegressor
 
 from sklearn.cluster import KMeans
 
@@ -69,10 +69,10 @@ def df_transform(df):
     df['perishable'] = df['perishable'].map({0:1.0, 1:1.25})
     
     # distance to the payday
-    df['payday'] = np.minimum(31-df['day'],np.abs(15-df['day']))
-    df['payday'] = np.minimum(df['day']-1, df['payday'])
+    df['payday'] = np.minimum(31 - df['day'], np.abs(15 - df['day']))
+    df['payday'] = np.minimum(df['day'] - 1, df['payday'])
     gc.collect()
-    df.fillna(-1,inplace =True)
+    df.fillna(-1, inplace=True)
 
     return df
 
@@ -113,14 +113,14 @@ def prepare(path, remove_days_after_earthquake=0):
     dtypes = {'id':'int64', 'item_nbr':'int32', 'store_nbr':'int8', 'onpromotion':str}
     data = {
 
-        'tra': pd.read_csv(path+'train.csv', dtype=dtypes, parse_dates=['date']),
-        'tes': pd.read_csv(path+'test.csv', dtype=dtypes, parse_dates=['date']),
-        'ite': pd.read_csv(path+'items.csv'),
-        'sto': pd.read_csv(path+'stores.csv'),
+        'tra': pd.read_csv(path + 'train.csv', dtype=dtypes, parse_dates=['date']),
+        'tes': pd.read_csv(path + 'test.csv', dtype=dtypes, parse_dates=['date']),
+        'ite': pd.read_csv(path + 'items.csv'),
+        'sto': pd.read_csv(path + 'stores.csv'),
 
 #         'trn': pd.read_csv(path+'transactions.csv', parse_dates=['date']),
 
-        'hol': pd.read_csv(path+'holidays_events.csv', dtype={'transferred':str}, parse_dates=['date']),
+        'hol': pd.read_csv(path + 'holidays_events.csv', dtype={'transferred':str}, parse_dates=['date']),
 
     }
 
@@ -134,7 +134,7 @@ def prepare(path, remove_days_after_earthquake=0):
 
     # select one month only
 
-    train = data['tra'][(data['tra']['date'].dt.year>2015 ) & (data['tra']['date'].dt.month>=6) & (data['tra']['date'].dt.month<=9)\
+    train = data['tra'][(data['tra']['date'].dt.year > 2015) & (data['tra']['date'].dt.month >= 6) & (data['tra']['date'].dt.month <= 9)\
 #                         & (data['tra']['store_nbr']==1)\
                         ]
 
@@ -144,7 +144,7 @@ def prepare(path, remove_days_after_earthquake=0):
 
     del data['tra']; gc.collect();
 
-    train = train[train['unit_sales']>=0]
+    train = train[train['unit_sales'] >= 0]
 
 #     target = train['unit_sales'].values
 # 
@@ -194,7 +194,7 @@ def prepare(path, remove_days_after_earthquake=0):
     
     print('---Join holidays')
 
-    data['hol'] = data['hol'][['date','transferred']]
+    data['hol'] = data['hol'][['date', 'transferred']]
 
     data['hol']['transferred'] = data['hol']['transferred'].map({'False': 0, 'True': 1})
 
@@ -216,34 +216,34 @@ def prepare(path, remove_days_after_earthquake=0):
 
 #     col = [c for c in train if c not in ['id', 'unit_sales','perishable','transactions']]
 
-    print('Dataset prepared, elapsed time ',(time.time() - start_time))
+    print('Dataset prepared, elapsed time ', (time.time() - start_time))
   
 
-    return train,test
+    return train, test
 
     
 
     
 # normalize column with idx indices 
-def normalize(data,idx):
+def normalize(data, idx):
 
     mean = []
 
-    sds= []
+    sds = []
 
     for i in idx:        
 
-        m = np.mean( data.loc[:, i])
+        m = np.mean(data.loc[:, i])
 
         sd = np.std(data.loc[:, i])
 
-        data.loc[:,i] = (data.loc[:,i]-m)/sd
+        data.loc[:, i] = (data.loc[:, i] - m) / sd
 
         mean.append(m)
 
         sds.append(sd)
 
-    return mean,sds
+    return mean, sds
 
 
 
@@ -254,77 +254,77 @@ def split_by_date(df, ratio=0.95):
 
     max_date = np.max(df['date'])
 
-    period = max_date-min_date
+    period = max_date - min_date
 
-    split = min_date + period*ratio
+    split = min_date + period * ratio
 
     train = df[df['date'] <= split]
 
     test = df[df['date'] > split]
 
-    return train,test
+    return train, test
 
 
 # split in test and train by specific month (which is taken for test)
-def split_by_month_in_test(df, year=2016, month = 8):
+def split_by_month_in_test(df, year=2016, month=8):
 
-    idx= (df['date'].dt.month==month) & (df['date'].dt.year==year)
+    idx = (df['date'].dt.month == month) & (df['date'].dt.year == year)
 
     train = df[~idx]
 
     test = df[idx]
 
-    return train,test
+    return train, test
 
 
 
 # Normalized Weighted Root Mean Squared Logarithmic Error 
 
-def nwrmsle(weights,real,pred):
+def nwrmsle(weights, real, pred):
 
     norm = np.sum(weights)
 
     sum = 0 
 
-    for i in range(1,len(real)):
+    for i in range(1, len(real)):
 
-        s1 = max(real[i],0)
+        s1 = max(real[i], 0)
 
-        s2 = max(pred[i],0)
+        s2 = max(pred[i], 0)
 
-        s= pow(log(s1+1) -log(1+s2),2) * weights[i]
+        s = pow(log(s1 + 1) - log(1 + s2), 2) * weights[i]
 
-        sum+=s 
+        sum += s 
 
         
-    return sqrt(sum/norm)
+    return sqrt(sum / norm)
 
 
 
 # cluster items with Kmeans in specified number of clusters
-def cluster_items(train,test,clusters=100):
+def cluster_items(train, test, clusters=100):
 
-    aggr = train.groupby(['item_nbr','weekday'], as_index=False)['unit_sales'].agg({'av_sales':'mean'})
+    aggr = train.groupby(['item_nbr', 'weekday'], as_index=False)['unit_sales'].agg({'av_sales':'mean'})
 
     kmeans = KMeans(n_clusters=clusters, random_state=0).fit(aggr)
 
     aggr['kcluster'] = kmeans.labels_
 
-    cols = ['kcluster','av_sales']
+    cols = ['kcluster', 'av_sales']
 
-    train = pd.merge(train, aggr, how='left', on=['item_nbr','weekday'])
+    train = pd.merge(train, aggr, how='left', on=['item_nbr', 'weekday'])
 
-    test = pd.merge(test, aggr, how='left', on=['item_nbr','weekday'])
+    test = pd.merge(test, aggr, how='left', on=['item_nbr', 'weekday'])
 
-    return train,test
+    return train, test
 
 
 # make equal binning of items by sales unit
-def bin_items(train,test,clusters =100):
+def bin_items(train, test, clusters=100):
 
     aggr = train.groupby(['item_nbr'], as_index=False)['unit_sales'].agg({'av_sales':'mean'})
 
-    bins = pd.qcut(aggr['av_sales'],clusters,labels=False,duplicates='drop')
+    bins = pd.qcut(aggr['av_sales'], clusters, labels=False, duplicates='drop')
 
     
 
@@ -337,18 +337,18 @@ def bin_items(train,test,clusters =100):
 
     new_items = set(test['item_nbr'].unique()) - set(train['item_nbr'].unique())
  
-    new_items = pd.DataFrame(list(new_items), columns= ['item_nbr'])
+    new_items = pd.DataFrame(list(new_items), columns=['item_nbr'])
  
-    new_items = new_items.merge(test[~test['item_nbr'].duplicated()], how='left', on=['item_nbr',])
+    new_items = new_items.merge(test[~test['item_nbr'].duplicated()], how='left', on=['item_nbr', ])
  
     # compute average bin value for the following grouping
     aggr2 = train.groupby(['family', 'class', 'perishable'], as_index=False)['bin'].agg({'av_bin':'mean'})
  
-    new_items =  pd.merge(new_items, aggr2, how='left', on=['family', 'class', 'perishable'])
+    new_items = pd.merge(new_items, aggr2, how='left', on=['family', 'class', 'perishable'])
  
     new_items['bin'] = new_items.round({'av_bin':0})['av_bin']
  
-    all_items = aggr[['item_nbr','bin']].append(new_items[['item_nbr','bin']])
+    all_items = aggr[['item_nbr', 'bin']].append(new_items[['item_nbr', 'bin']])
 
 #     del aggr,aggr2,new_items,bins; gc.collect();
 
@@ -366,7 +366,7 @@ def bin_items(train,test,clusters =100):
 #     test['bin']
 
     
-    test['bin'] = test['bin'].fillna(clusters/2)
+    test['bin'] = test['bin'].fillna(clusters / 2)
     
 
 #     aggr = train.groupby(['family', 'class', 'perishable'], as_index=False)['bin'].agg({'av_bin':'mean'})
@@ -378,35 +378,37 @@ def bin_items(train,test,clusters =100):
     # for unseen items - find the average bin from similar products 
  
 
-    return train,test
+    return train, test
 
 
 
 if __name__ == '__main__':
 
+    loadPrepared = True
     
 
     random.seed(234)
+    dtypes = {'id':'int64', 'item_nbr':'int32', 'store_nbr':'int8', \
 
-    train,real_test = prepare(path)
-    print('saving prepared data')
-    train.to_csv(path+"prepared_train_2017_6_9.csv")
-    real_test.to_csv(path+"prepared_test.csv")
-    train_all=train
-    real_test_all = real_test
-# 
-# #      
-
+              'yea':'uint16', 'mon':'uint8', 'day':'uint8', 'weekday':'uint8'}
+    if(not loadPrepared):
+        print('Preparing data')
+        train, real_test = prepare(path)
+        print('Saving prepared data')
+        
+        train.to_csv(path + "prepared_train_2017_6_9.csv")
+        real_test.to_csv(path + "prepared_test.csv")
+        
+        train_all = train
+        real_test_all = real_test
+    else:
+        print('Reading files')
+        train_all = pd.read_csv(path + 'prepared_train_2017_6_9.csv', dtype=dtypes, parse_dates=['date'])
+        real_test_all = pd.read_csv(path + 'prepared_test.csv', dtype=dtypes, parse_dates=['date'])
+#         eval_test_all = train_all[(train_all['mon'] == 8)&(train_all['yea'] == 2017)]
     
-
-    dtypes = {'id':'int64', 'item_nbr':'int32', 'store_nbr':'int8',  \
-
-              'yea':'uint16', 'mon':'uint8', 'day':'uint8','weekday':'uint8'}
-
-  
-
-    print('Reading files')
-
+    # TODO this remove 
+#     train_all = train_all[~ (train_all['mon'] == 8)&(train_all['yea'] == 2017)]
 #     train_all = pd.read_csv(path+'prepared_train_2017_8.csv', dtype=dtypes, parse_dates=['date'])
 # 
 #     real_test_all = pd.read_csv(path+'prepared_test.csv', dtype=dtypes, parse_dates=['date'])
@@ -423,36 +425,34 @@ if __name__ == '__main__':
 
 
 
-    stores =np.sort( train_all['store_nbr'].unique())#[range(0,3)]
+    stores = np.sort(train_all['store_nbr'].unique())  # [range(0,3)]
 
-    predictions= pd.DataFrame()
+    predictions = pd.DataFrame()
 
     eval_predictions = pd.DataFrame()
 
     eval_true = []
 
-    weights=[]
+    weights = []
 
-    model =3
+    # model to use
+    model = 3
 
+    # consider all stores separately
     for s in stores:
 
-        print('processing store ', s )
-
-        train = train_all[train_all['store_nbr']==s]
+        print('processing store ', s, ' from ', len(stores))
+        train = train_all[train_all['store_nbr'] == s]
 #         eval_test = eval_test_all[eval_test_all['store_nbr']==s]
-        real_test = real_test_all[real_test_all['store_nbr']==s]
+        real_test = real_test_all[real_test_all['store_nbr'] == s]
 
-        
-
-        ids =train[(train['mon'] == 8)&(train['yea'] == 2016)]['id']
+        ids = train[(train['mon'] == 8) & (train['yea'] == 2016)]['id']
 
         
 
         print('Clustering')
 
         train, real_test = bin_items(train, real_test, 150)
-
         real_test = real_test.fillna(-1)    
 
         print('Clustered')
@@ -463,15 +463,15 @@ if __name__ == '__main__':
 
         cols_to_vector = ['weekday', 'mon', 'yea']
 
-        train = pd.get_dummies(train, columns = cols_to_vector)
+        train = pd.get_dummies(train, columns=cols_to_vector)
 
-        real_test = pd.get_dummies(real_test, columns = cols_to_vector)
+        real_test = pd.get_dummies(real_test, columns=cols_to_vector)
 
         missing_cols = set(train.columns) - set(real_test.columns)
 
         for c in missing_cols:
 
-            real_test[c]=0
+            real_test[c] = 0
 
             
 
@@ -479,7 +479,7 @@ if __name__ == '__main__':
 
         for c in missing_cols:
 
-            train[c]=0
+            train[c] = 0
 
         print('Vectorizing is done')
 
@@ -489,62 +489,55 @@ if __name__ == '__main__':
 
         print('splitting in x and y')
 
-        columns_to_excl = ['unit_sales', 'date','id','item_nbr','store_nbr']   
-        #split
+        columns_to_excl = ['unit_sales', 'date', 'id', 'item_nbr', 'store_nbr']   
+        
+        # split into train and evaluation
+        
         eval_test = train[train['id'].isin(ids)]
-#         train= train[~train['id'].isin(ids)]
+        train = train[~train['id'].isin(ids)]
+
 
         trainY = train['unit_sales']
-
         trainX = train[[i for i in list(train.columns) if i not in columns_to_excl]]
-
         real_testX = real_test[[i for i in list(real_test.columns) if i not in columns_to_excl]]
-
-
-
-#         eval_test = train[train['id'].isin(ids)]
-
         eval_testY = eval_test['unit_sales']
-
         eval_testX = eval_test[[i for i in list(eval_test.columns) if i not in columns_to_excl]]
 
 
 
 #         weights = real_testX['perishable']
+        
+        if model == 1:
 
-        cut = 0.+1e-12
+            name = 'btr'
 
-        if model ==1:
+            print('Fitting ' + name + ' regression model')
 
-            name='btr'
+            regr = BaggingRegressor(DecisionTreeRegressor(max_depth=10, max_features=0.6), n_jobs=2, verbose=True)      
 
-            print('Fitting ' +name+' regression model')
+        elif model == 2:
 
-            regr = BaggingRegressor(DecisionTreeRegressor(max_depth=10,max_features=0.6), n_jobs=2,verbose=True)      
+            name = 'AdaBoostRegressor'
 
-        elif model ==2:
-
-            name='AdaBoostRegressor'
-
-            print('Fitting ' +name+' regression model')
+            print('Fitting ' + name + ' regression model')
 
             regr = AdaBoostRegressor()     
 
-        elif model ==3:
+        elif model == 3:
 
-            name='GradientBoostingRegressor'
+            name = 'GradientBoostingRegressor'
 
-            print('Fitting ' +name+' regression model')
+            print('Fitting ' + name + ' regression model')
 
-            regr = GradientBoostingRegressor(n_estimators =1000, verbose=1)  
+            regr = GradientBoostingRegressor(n_estimators=100, verbose=1)  
 
-        elif model ==4:
+        elif model == 4:
 
-            name='RandomForestRegressor'
+            name = 'RandomForestRegressor'
 
-            print('Fitting ' +name+' regression model')
+            print('Fitting ' + name + ' regression model')
 
-            regr = RandomForestRegressor(verbose=1,n_jobs=2)
+            regr = RandomForestRegressor(verbose=1, n_jobs=2)
 
         
 
@@ -560,7 +553,7 @@ if __name__ == '__main__':
 
             weights.extend(eval_testX['perishable'])
 
-            cut = 0.+1e-12 # 0.+1e-15
+            cut = 0. + 1e-12  # 0.+1e-15
 
             ids = eval_test['id']
 
@@ -568,7 +561,7 @@ if __name__ == '__main__':
 
     
 
-            store_prediction = pd.DataFrame({'id':ids,'unit_sales':pred_y})
+            store_prediction = pd.DataFrame({'id':ids, 'unit_sales':pred_y})
 
             eval_predictions = eval_predictions.append(store_prediction)
 
@@ -578,7 +571,7 @@ if __name__ == '__main__':
 
         print('Predict real test')
 
-        if len(real_testX) !=0:
+        if len(real_testX) != 0:
 
             pred_y = regr.predict(real_testX)
             #     pred_y = np.exp(pred_y)
@@ -590,21 +583,21 @@ if __name__ == '__main__':
 
         
 
-            store_prediction = pd.DataFrame({'id':ids,'unit_sales':pred_y})
+            store_prediction = pd.DataFrame({'id':ids, 'unit_sales':pred_y})
 
-            predictions =predictions.append(store_prediction)
+            predictions = predictions.append(store_prediction)
 
 
 
     
 
     eval_predictions = eval_predictions.fillna(0)    
-    score=0
-#     score = nwrmsle(weights, eval_true, eval_predictions['unit_sales'].tolist())
+    score = 0
+    score = nwrmsle(weights, eval_true, eval_predictions['unit_sales'].tolist())
 #     eval_predictions.to_csv(path+'Predictions/eval_s' \
 # 
 #                                                + str(np.around(score,2))+'.csv', index=False)
-#     print("nwrmsle score for regression: ", score)    
+    print("nwrmsle score for regression on eval set is: ", score)    
 
     
 #     real_test_all = real_test_all.drop('unit_sales', 1)
@@ -617,9 +610,9 @@ if __name__ == '__main__':
     real_test_all['unit_sales'] = np.abs(real_test_all['unit_sales'])
 
 
-    real_test_all[['id','unit_sales']].to_csv(path+'Predictions/submission_lr_s' \
+    real_test_all[['id', 'unit_sales']].to_csv(path + 'Predictions/submission_lr_s' \
 
-                                               + str(np.around(score,2))+'_' + str(time.time()) +'.csv', index=False)
+                                               + str(np.around(score, 2)) + '_' + str(time.time()) + '.csv', index=False)
 
 
     print('Prediction results saved')
