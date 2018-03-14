@@ -14,47 +14,20 @@ import numpy as np
 
 import pandas as pd
 
-import random
-
 import matplotlib
 
 from math import log, sqrt
 
 matplotlib.use('TkAgg')
 
-from calendar import monthrange
-
-import matplotlib.pyplot as plt
-
-import seaborn as sns
-
-from sklearn.feature_extraction import DictVectorizer as DV
-
-from sklearn.preprocessing import LabelBinarizer
-
-
-
-from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor, GradientBoostingRegressor
-
 from sklearn.cluster import KMeans
 
 import gc; gc.enable()
 
-from sklearn import preprocessing, linear_model, metrics
+from sklearn import preprocessing
 
-from sklearn.metrics import mean_squared_error, r2_score
 
 import time
-
-from sklearn.ensemble import BaggingRegressor
-
-from sklearn.tree import DecisionTreeRegressor
-
-from sklearn.neural_network import MLPRegressor
-
-
-
-path = '~/Documents/tensorflow/Kaggle/Favorita/'
 
 # decode date, add payday field
 def df_transform(df):
@@ -98,7 +71,6 @@ def df_lbl_enc(df):
 
 
 # prepare the dataset
-
 def prepare(path, remove_days_after_earthquake=0):
 
     # track time
@@ -124,37 +96,20 @@ def prepare(path, remove_days_after_earthquake=0):
 
     }
 
-    
-
-    
-
     print('Process dataset')
 
     
 
     # select one month only
-
     train = data['tra'][(data['tra']['date'].dt.year > 2015) & (data['tra']['date'].dt.month >= 6) & (data['tra']['date'].dt.month <= 9)\
 #                         & (data['tra']['store_nbr']==1)\
                         ]
-
-#     train = data['tra']
-
-
 
     del data['tra']; gc.collect();
 
     train = train[train['unit_sales'] >= 0]
 
-#     target = train['unit_sales'].values
-# 
-#     target[target < 0.] = 0. # better drop them or imput with mean
-# 
-#     train['unit_sales'] = np.log1p(target)    
-
     # join data
-
-    
     print('---Join items')
     data['ite'] = df_lbl_enc(data['ite'])
 
@@ -279,12 +234,11 @@ def split_by_month_in_test(df, year=2016, month=8):
 
 
 # Normalized Weighted Root Mean Squared Logarithmic Error 
-
 def nwrmsle(weights, real, pred):
 
     norm = np.sum(weights)
 
-    sum = 0 
+    err_sum = 0 
 
     for i in range(1, len(real)):
 
@@ -294,10 +248,10 @@ def nwrmsle(weights, real, pred):
 
         s = pow(log(s1 + 1) - log(1 + s2), 2) * weights[i]
 
-        sum += s 
+        err_sum += s 
 
         
-    return sqrt(sum / norm)
+    return sqrt(err_sum / norm)
 
 
 
@@ -309,8 +263,6 @@ def cluster_items(train, test, clusters=100):
     kmeans = KMeans(n_clusters=clusters, random_state=0).fit(aggr)
 
     aggr['kcluster'] = kmeans.labels_
-
-    cols = ['kcluster', 'av_sales']
 
     train = pd.merge(train, aggr, how='left', on=['item_nbr', 'weekday'])
 
@@ -325,16 +277,9 @@ def bin_items(train, test, clusters=100):
     aggr = train.groupby(['item_nbr'], as_index=False)['unit_sales'].agg({'av_sales':'mean'})
 
     bins = pd.qcut(aggr['av_sales'], clusters, labels=False, duplicates='drop')
-
-    
-
     aggr['bin'] = bins
-
     train = pd.merge(train, aggr, how='left', on=['item_nbr'])
  
-
-    
-
     new_items = set(test['item_nbr'].unique()) - set(train['item_nbr'].unique())
  
     new_items = pd.DataFrame(list(new_items), columns=['item_nbr'])
@@ -343,21 +288,13 @@ def bin_items(train, test, clusters=100):
  
     # compute average bin value for the following grouping
     aggr2 = train.groupby(['family', 'class', 'perishable'], as_index=False)['bin'].agg({'av_bin':'mean'})
- 
     new_items = pd.merge(new_items, aggr2, how='left', on=['family', 'class', 'perishable'])
- 
     new_items['bin'] = new_items.round({'av_bin':0})['av_bin']
  
     all_items = aggr[['item_nbr', 'bin']].append(new_items[['item_nbr', 'bin']])
 
 #     del aggr,aggr2,new_items,bins; gc.collect();
-
-
-
 #     all_items = pd.concat([aggr[['item_nbr','bin']], new_items[['item_nbr','bin']]], axis = 0)
-
-    
-
 #     test = pd.merge(test, all_items, how='left', on=['item_nbr'])
     test = pd.merge(test, aggr, how='left', on=['item_nbr'])
 
@@ -367,253 +304,7 @@ def bin_items(train, test, clusters=100):
 
     
     test['bin'] = test['bin'].fillna(clusters / 2)
-    
-
-#     aggr = train.groupby(['family', 'class', 'perishable'], as_index=False)['bin'].agg({'av_bin':'mean'})
-
-#     test = pd.merge(test, new_items, how='left', on=['item_nbr',])
-
-
-
-    # for unseen items - find the average bin from similar products 
- 
-
     return train, test
 
 
 
-if __name__ == '__main__':
-
-    loadPrepared = True
-    
-
-    random.seed(234)
-    dtypes = {'id':'int64', 'item_nbr':'int32', 'store_nbr':'int8', \
-
-              'yea':'uint16', 'mon':'uint8', 'day':'uint8', 'weekday':'uint8'}
-    if(not loadPrepared):
-        print('Preparing data')
-        train, real_test = prepare(path)
-        print('Saving prepared data')
-        
-        train.to_csv(path + "prepared_train_2017_6_9.csv")
-        real_test.to_csv(path + "prepared_test.csv")
-        
-        train_all = train
-        real_test_all = real_test
-    else:
-        print('Reading files')
-        train_all = pd.read_csv(path + 'prepared_train_2017_6_9.csv', dtype=dtypes, parse_dates=['date'])
-        real_test_all = pd.read_csv(path + 'prepared_test.csv', dtype=dtypes, parse_dates=['date'])
-#         eval_test_all = train_all[(train_all['mon'] == 8)&(train_all['yea'] == 2017)]
-    
-    # TODO this remove 
-#     train_all = train_all[~ (train_all['mon'] == 8)&(train_all['yea'] == 2017)]
-#     train_all = pd.read_csv(path+'prepared_train_2017_8.csv', dtype=dtypes, parse_dates=['date'])
-# 
-#     real_test_all = pd.read_csv(path+'prepared_test.csv', dtype=dtypes, parse_dates=['date'])
-    
-    
-    
-#     eval_test_all = train_all[(train_all['mon'] == 8)&(train_all['yea'] == 2017)]
-    
-    # TODO this remove 
-#     train_all = train_all[~ (train_all['mon'] == 8)&(train_all['yea'] == 2017)]
-    
-    
-    print('Data loaded')
-
-
-
-    stores = np.sort(train_all['store_nbr'].unique())  # [range(0,3)]
-
-    predictions = pd.DataFrame()
-
-    eval_predictions = pd.DataFrame()
-
-    eval_true = []
-
-    weights = []
-
-    # model to use
-    model = 3
-
-    # consider all stores separately
-    for s in stores:
-
-        print('processing store ', s, ' from ', len(stores))
-        train = train_all[train_all['store_nbr'] == s]
-#         eval_test = eval_test_all[eval_test_all['store_nbr']==s]
-        real_test = real_test_all[real_test_all['store_nbr'] == s]
-
-        ids = train[(train['mon'] == 8) & (train['yea'] == 2016)]['id']
-
-        
-
-        print('Clustering')
-
-        train, real_test = bin_items(train, real_test, 150)
-        real_test = real_test.fillna(-1)    
-
-        print('Clustered')
-
-        
-
-        print('Vectorizing')
-
-        cols_to_vector = ['weekday', 'mon', 'yea']
-
-        train = pd.get_dummies(train, columns=cols_to_vector)
-
-        real_test = pd.get_dummies(real_test, columns=cols_to_vector)
-
-        missing_cols = set(train.columns) - set(real_test.columns)
-
-        for c in missing_cols:
-
-            real_test[c] = 0
-
-            
-
-        missing_cols = set(real_test.columns) - set(train.columns)
-
-        for c in missing_cols:
-
-            train[c] = 0
-
-        print('Vectorizing is done')
-
-       
-
-       
-
-        print('splitting in x and y')
-
-        columns_to_excl = ['unit_sales', 'date', 'id', 'item_nbr', 'store_nbr']   
-        
-        # split into train and evaluation
-        
-        eval_test = train[train['id'].isin(ids)]
-        train = train[~train['id'].isin(ids)]
-
-
-        trainY = train['unit_sales']
-        trainX = train[[i for i in list(train.columns) if i not in columns_to_excl]]
-        real_testX = real_test[[i for i in list(real_test.columns) if i not in columns_to_excl]]
-        eval_testY = eval_test['unit_sales']
-        eval_testX = eval_test[[i for i in list(eval_test.columns) if i not in columns_to_excl]]
-
-
-
-#         weights = real_testX['perishable']
-        
-        if model == 1:
-
-            name = 'btr'
-
-            print('Fitting ' + name + ' regression model')
-
-            regr = BaggingRegressor(DecisionTreeRegressor(max_depth=10, max_features=0.6), n_jobs=2, verbose=True)      
-
-        elif model == 2:
-
-            name = 'AdaBoostRegressor'
-
-            print('Fitting ' + name + ' regression model')
-
-            regr = AdaBoostRegressor()     
-
-        elif model == 3:
-
-            name = 'GradientBoostingRegressor'
-
-            print('Fitting ' + name + ' regression model')
-
-            regr = GradientBoostingRegressor(n_estimators=100, verbose=1)  
-
-        elif model == 4:
-
-            name = 'RandomForestRegressor'
-
-            print('Fitting ' + name + ' regression model')
-
-            regr = RandomForestRegressor(verbose=1, n_jobs=2)
-
-        
-
-        regr.fit(trainX, trainY)
-
-        
-
-        print('Predict eval_test')
-
-        if len(eval_testX) != 0:
-
-            pred_y = regr.predict(eval_testX)
-
-            weights.extend(eval_testX['perishable'])
-
-            cut = 0. + 1e-12  # 0.+1e-15
-
-            ids = eval_test['id']
-
-#             pred_y= np.clip(np.exp(pred_y) - 1, a_min=cut,a_max=None)
-
-    
-
-            store_prediction = pd.DataFrame({'id':ids, 'unit_sales':pred_y})
-
-            eval_predictions = eval_predictions.append(store_prediction)
-
-            eval_true.extend(eval_testY)
-
-        
-
-        print('Predict real test')
-
-        if len(real_testX) != 0:
-
-            pred_y = regr.predict(real_testX)
-            #     pred_y = np.exp(pred_y)
-
-            ids = real_test['id']
-#             real_testX.to_csv(path+'Predictions/t.csv')
-#             pred_y.to_csv(path+'Predictions/t2.csv')
-#             pred_y= np.clip(np.exp(pred_y) - 1, a_min=cut,a_max=None)
-
-        
-
-            store_prediction = pd.DataFrame({'id':ids, 'unit_sales':pred_y})
-
-            predictions = predictions.append(store_prediction)
-
-
-
-    
-
-    eval_predictions = eval_predictions.fillna(0)    
-    score = 0
-    score = nwrmsle(weights, eval_true, eval_predictions['unit_sales'].tolist())
-#     eval_predictions.to_csv(path+'Predictions/eval_s' \
-# 
-#                                                + str(np.around(score,2))+'.csv', index=False)
-    print("nwrmsle score for regression on eval set is: ", score)    
-
-    
-#     real_test_all = real_test_all.drop('unit_sales', 1)
-    real_test_all = pd.merge(real_test_all, predictions, how='left', on=['id'])
-    print(real_test_all.isnull().sum())
-
-    # #     to_save.to_csv(path+'Predictions/submission_lr_s' + str(np.around(score,2))+'_' + str(time.time()) +'.csv', index=False)
-
-    real_test_all = real_test_all.fillna(0)    
-    real_test_all['unit_sales'] = np.abs(real_test_all['unit_sales'])
-
-
-    real_test_all[['id', 'unit_sales']].to_csv(path + 'Predictions/submission_lr_s' \
-
-                                               + str(np.around(score, 2)) + '_' + str(time.time()) + '.csv', index=False)
-
-
-    print('Prediction results saved')
-        
